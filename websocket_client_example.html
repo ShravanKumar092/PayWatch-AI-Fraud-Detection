@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PayWatch AI - Real-Time Fraud Detection (WebSocket Client)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0E1117 0%, #1a1f2e 100%);
+            color: #FAFAFA;
+            padding: 20px;
+            position: relative;
+            overflow-x: hidden;
+        }
+        /* Decorative repeating currency-symbol background (non-interactive) */
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><text x='10' y='40' font-size='32' fill='rgba(255,255,255,0.04)' font-family='Segoe UI, Arial, sans-serif'>₹ $ € £ ¥</text></svg>");
+            background-repeat: repeat;
+            background-position: center;
+            opacity: 1;
+            transform: translateZ(0);
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1; /* keep content above decorative background */
+        }
+        h1 {
+            text-align: center;
+            color: #00E5FF;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            justify-content: center;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .btn-start {
+            background: #00E5FF;
+            color: #0E1117;
+        }
+        .btn-start:hover {
+            background: #00b8cc;
+        }
+        .btn-stop {
+            background: #ff4444;
+            color: white;
+        }
+        .btn-stop:hover {
+            background: #cc0000;
+        }
+        .status {
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .status.connected {
+            background: #00ff88;
+            color: #0E1117;
+        }
+        .status.disconnected {
+            background: #ff4444;
+            color: white;
+        }
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: #262730;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        .card h3 {
+            color: #00E5FF;
+            margin-bottom: 15px;
+        }
+        .metric {
+            font-size: 2em;
+            font-weight: bold;
+            color: #00E5FF;
+        }
+        .transaction-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .transaction-item {
+            background: #1a1f2e;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border-left: 4px solid #00E5FF;
+        }
+        .transaction-item.high-risk {
+            border-left-color: #ff4444;
+            background: #2a1f1f;
+        }
+        .transaction-item.medium-risk {
+            border-left-color: #ffaa00;
+        }
+        .risk-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 0.9em;
+            margin-left: 10px;
+        }
+        .risk-high {
+            background: #ff4444;
+            color: white;
+        }
+        .risk-medium {
+            background: #ffaa00;
+            color: #0E1117;
+        }
+        .risk-low {
+            background: #00ff88;
+            color: #0E1117;
+        }
+        .alert {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 20px;
+            background: #ff4444;
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(255, 68, 68, 0.5);
+            animation: slideIn 0.3s;
+            z-index: 1000;
+            max-width: 400px;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+            }
+            to {
+                transform: translateX(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚨 PayWatch AI - Real-Time Fraud Detection</h1>
+        
+        <div class="controls">
+            <button class="btn-start" id="btnStart" onclick="connect()">▶ Start Monitoring</button>
+            <button class="btn-stop" id="btnStop" onclick="disconnect()" disabled>⏹ Stop Monitoring</button>
+        </div>
+        
+        <div class="status disconnected" id="status">Disconnected</div>
+        
+        <div class="dashboard">
+            <div class="card">
+                <h3>📊 Statistics</h3>
+                <div>Total Transactions: <span class="metric" id="totalTx">0</span></div>
+                <div>High-Risk: <span class="metric" id="highRisk">0</span></div>
+                <div>Medium-Risk: <span class="metric" id="mediumRisk">0</span></div>
+                <div>Low-Risk: <span class="metric" id="lowRisk">0</span></div>
+            </div>
+            
+            <div class="card">
+                <h3>⚡ Performance</h3>
+                <div>Transactions/sec: <span class="metric" id="txPerSec">0</span></div>
+                <div>Avg Response Time: <span class="metric" id="avgResponse">0</span>ms</div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3>📜 Real-Time Transactions</h3>
+            <div class="transaction-list" id="transactionList"></div>
+        </div>
+    </div>
+
+    <script>
+        let ws = null;
+        let stats = {
+            total: 0,
+            high: 0,
+            medium: 0,
+            low: 0,
+            responseTimes: []
+        };
+        let startTime = null;
+        const WS_URL = 'ws://127.0.0.1:8010/ws/stream';
+
+        // Map currency codes to symbols (used for display)
+        function getCurrencySymbol(code) {
+            if (!code) return '$';
+            const map = {
+                'USD': '$',
+                'INR': '₹',
+                'EUR': '€',
+                'GBP': '£',
+                'JPY': '¥',
+                'AUD': 'A$',
+                'CAD': 'C$'
+            };
+            return map[code.toUpperCase()] || code;
+        }
+
+        function connect() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                return;
+            }
+
+            ws = new WebSocket(WS_URL);
+            startTime = Date.now();
+
+            ws.onopen = function() {
+                document.getElementById('status').textContent = 'Connected';
+                document.getElementById('status').className = 'status connected';
+                document.getElementById('btnStart').disabled = true;
+                document.getElementById('btnStop').disabled = false;
+            };
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'transaction') {
+                    handleTransaction(data.transaction, data.prediction);
+                } else if (data.type === 'fraud_alert') {
+                    showAlert(data);
+                }
+            };
+
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                showAlert({
+                    type: 'error',
+                    message: 'Connection error. Make sure the API server is running.'
+                });
+            };
+
+            ws.onclose = function() {
+                document.getElementById('status').textContent = 'Disconnected';
+                document.getElementById('status').className = 'status disconnected';
+                document.getElementById('btnStart').disabled = false;
+                document.getElementById('btnStop').disabled = true;
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function handleTransaction(tx, prediction) {
+            const responseTime = Date.now() - startTime;
+            stats.responseTimes.push(responseTime);
+            if (stats.responseTimes.length > 100) {
+                stats.responseTimes.shift();
+            }
+
+            stats.total++;
+            const risk = prediction.risk_level;
+            if (risk === 'HIGH') stats.high++;
+            else if (risk === 'MEDIUM') stats.medium++;
+            else stats.low++;
+
+            updateStats();
+            addTransactionToList(tx, prediction);
+            
+            // Show alert for high-risk transactions
+            if (risk === 'HIGH') {
+                showAlert({
+                    type: 'fraud_alert',
+                    transaction: tx,
+                    prediction: prediction
+                });
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('totalTx').textContent = stats.total;
+            document.getElementById('highRisk').textContent = stats.high;
+            document.getElementById('mediumRisk').textContent = stats.medium;
+            document.getElementById('lowRisk').textContent = stats.low;
+            
+            const elapsed = (Date.now() - startTime) / 1000;
+            document.getElementById('txPerSec').textContent = (stats.total / elapsed).toFixed(2);
+            
+            if (stats.responseTimes.length > 0) {
+                const avg = stats.responseTimes.reduce((a, b) => a + b, 0) / stats.responseTimes.length;
+                document.getElementById('avgResponse').textContent = avg.toFixed(0);
+            }
+        }
+
+        function addTransactionToList(tx, prediction) {
+            const list = document.getElementById('transactionList');
+            const item = document.createElement('div');
+            item.className = `transaction-item ${prediction.risk_level.toLowerCase()}-risk`;
+            const riskClass = `risk-${prediction.risk_level.toLowerCase()}`;
+            const prob = (prediction.fraud_probability * 100).toFixed(2);
+            const symbol = getCurrencySymbol(tx.currency || tx.currency_code || 'USD');
+
+            item.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <strong>${tx.type}</strong>
+                        <span class="risk-badge ${riskClass}">${prediction.risk_level}</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <div>${symbol}${tx.amount.toFixed(2)}</div>
+                        <div style="font-size: 0.9em; color: #888;">${prob}% risk</div>
+                    </div>
+                </div>
+                <div style="margin-top: 10px; font-size: 0.85em; color: #aaa;">
+                    Time: ${new Date(tx.timestamp || Date.now()).toLocaleTimeString()}
+                </div>
+            `;
+            
+            list.insertBefore(item, list.firstChild);
+            
+            // Keep only last 50 transactions
+            while (list.children.length > 50) {
+                list.removeChild(list.lastChild);
+            }
+        }
+
+        function showAlert(data) {
+            const alert = document.createElement('div');
+            alert.className = 'alert';
+            
+            if (data.type === 'fraud_alert') {
+                const symbol = getCurrencySymbol(data.transaction.currency || data.transaction.currency_code || 'USD');
+                alert.innerHTML = `
+                    <h3>🚨 HIGH-RISK TRANSACTION DETECTED!</h3>
+                    <p><strong>Type:</strong> ${data.transaction.type}</p>
+                    <p><strong>Amount:</strong> ${symbol}${data.transaction.amount.toFixed(2)}</p>
+                    <p><strong>Risk:</strong> ${(data.prediction.fraud_probability * 100).toFixed(2)}%</p>
+                `;
+            } else {
+                alert.innerHTML = `<p>${data.message || 'Alert'}</p>`;
+            }
+            
+            document.body.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        // Auto-connect on page load (optional)
+        // connect();
+    </script>
+</body>
+</html>
+

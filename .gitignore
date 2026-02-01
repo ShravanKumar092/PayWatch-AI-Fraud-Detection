@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+.venv/
+venv/
+
+# Environment variables
+.env
+
+# Logs
+logs/
+*.log
+
+# Model files (optional – remove if you want to upload)
+fraud_model.joblib
+model_columns.joblib
+
+# Streamlit
+.streamlit/
+
+# OS
+.DS_Store
+Thumbs.db
