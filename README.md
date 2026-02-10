@@ -64,39 +64,7 @@ PayWatch AI is an AI-powered real-time fraud detection platform designed to moni
 
 ---
 
-## 🏗️ System Architecture
 
-# 💳 PayWatch AI – Real-Time Fraud Detection System
-
-PayWatch AI is an AI-powered real-time fraud detection platform designed to monitor financial transactions, identify suspicious behavior, and generate explainable fraud alerts using advanced machine learning and behavioral analytics.
-
----
-
-## 🚀 Key Features
-
-- Real-time fraud detection using live transaction streams  
-- Machine Learning models: LightGBM + Isolation Forest  
-- Behavioral rules: velocity & spending drift detection  
-- Explainable AI using SHAP values  
-- FastAPI backend with SSE (Server-Sent Events)  
-- Interactive Streamlit dashboard  
-- Redis-based live system statistics  
-- JWT authentication  
-- Auto-retraining ready architecture  
-
----
-
-## 🧠 How Fraud Is Detected
-
-1. Incoming transactions are streamed in real time  
-2. Feature engineering extracts behavioral signals  
-3. Velocity & drift rules catch abnormal behavior  
-4. LightGBM predicts fraud probability  
-5. Isolation Forest detects anomalies  
-6. Risk score is generated  
-7. SHAP explains why the transaction was flagged  
-
----
 
 ## 🏗️ System Architecture
 
